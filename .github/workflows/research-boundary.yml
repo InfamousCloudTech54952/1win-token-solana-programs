@@ -1,0 +1,37 @@
+name: Research - Empty Aggregate Boundary
+
+on:
+  push:
+    branches:
+      - research/empty-aggregate-boundary-20261104
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-sale-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact branch commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record source commit and verify test inputs
+        run: |
+          git rev-parse HEAD
+          git status --short
+          sha256sum tests/sale/tests/research_empty_aggregate_boundary.rs
+      - name: Install pinned Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.10/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Compile actual Sale and Burn SBF programs
+        run: |
+          cargo build-sbf --manifest-path programs/sale/Cargo.toml
+          cargo build-sbf --manifest-path programs/burn/Cargo.toml
+          sha256sum target/deploy/{sale,burn}.so
+      - name: Execute ONLY isolated new boundary tests
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: |
+          cargo test -p sale-test-common --test research_empty_aggregate_boundary --locked -- --nocapture
