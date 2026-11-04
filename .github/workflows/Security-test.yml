@@ -1,0 +1,38 @@
+
+name: 1win Security Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Record commit
+        run: git rev-parse HEAD
+
+      - name: Install Solana tools
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.10/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build smart contracts
+        run: |
+          cargo build-sbf --manifest-path programs/sale/Cargo.toml
+          cargo build-sbf --manifest-path programs/burn/Cargo.toml
+          cargo build-sbf --manifest-path programs/vesting/Cargo.toml
+          sha256sum target/deploy/{sale,burn,vesting}.so
+
+      - name: Run isolated transaction tests
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: |
+          cargo test -p sale-test-common -p burn-tests -p vesting-test-common --locked
